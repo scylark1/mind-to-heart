@@ -7,41 +7,43 @@ struct ThoughtDetailView: View {
     @State private var isPolishing = false
     @State private var errorMessage: String?
 
+    private var hasPolished: Bool {
+        !thought.polishedText.isEmpty
+    }
+
     var body: some View {
-        Form {
-            Section {
+        VStack(spacing: 0) {
+            VStack(spacing: 8) {
                 DatePicker("日期", selection: $thought.date)
-            }
+                    .labelsHidden()
 
-            Section {
-                Picker("版本", selection: $showOriginal) {
-                    Text("润色后").tag(false)
-                    Text("原文").tag(true)
-                }
-                .pickerStyle(.segmented)
-
-                if showOriginal {
-                    TextEditor(text: $thought.rawText)
-                        .frame(minHeight: 220)
-                } else if thought.polishedText.isEmpty {
-                    Text("还没有润色版本")
-                        .foregroundStyle(.secondary)
-                } else {
-                    TextEditor(text: $thought.polishedText)
-                        .frame(minHeight: 220)
+                if hasPolished {
+                    Picker("版本", selection: $showOriginal) {
+                        Text("润色后").tag(false)
+                        Text("原文").tag(true)
+                    }
+                    .pickerStyle(.segmented)
                 }
             }
+            .padding(.horizontal)
+            .padding(.top, 8)
 
-            Section {
+            if showOriginal || !hasPolished {
+                RichTextEditor(text: $thought.rawAttributedText)
+            } else {
+                RichTextEditor(text: $thought.polishedAttributedText)
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
                     Task { await polish() }
                 } label: {
-                    HStack {
-                        Label(thought.polishedText.isEmpty ? "润色" : "根据原文重新润色", systemImage: "wand.and.stars")
-                        if isPolishing {
-                            Spacer()
-                            ProgressView()
-                        }
+                    if isPolishing {
+                        ProgressView()
+                    } else {
+                        Label(hasPolished ? "根据原文重新润色" : "润色", systemImage: "wand.and.stars")
                     }
                 }
                 .disabled(isPolishing)
@@ -51,8 +53,6 @@ struct ThoughtDetailView: View {
                 }
             }
         }
-        .navigationTitle(thought.date.formatted(date: .abbreviated, time: .omitted))
-        .navigationBarTitleDisplayMode(.inline)
         .alert("出错了", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -67,7 +67,7 @@ struct ThoughtDetailView: View {
         isPolishing = true
         defer { isPolishing = false }
         do {
-            thought.polishedText = try await OpenAIService.fromSettings().polish(thought.rawText)
+            thought.polishedAttributedText = try await OpenAIService.fromSettings().polish(thought.rawAttributedText)
             showOriginal = false
         } catch {
             errorMessage = error.localizedDescription

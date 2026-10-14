@@ -26,12 +26,6 @@ struct ContentView: View {
         return thoughts.filter { Calendar.current.isDate($0.date, inSameDayAs: selectedDay) }
     }
 
-    /// 按天分组，最新的日期在最上面
-    private var sections: [(day: Date, items: [Thought])] {
-        let groups = Dictionary(grouping: filteredThoughts) { Calendar.current.startOfDay(for: $0.date) }
-        return groups.keys.sorted(by: >).map { (day: $0, items: groups[$0] ?? []) }
-    }
-
     var body: some View {
         NavigationStack {
             Group {
@@ -91,25 +85,23 @@ struct ContentView: View {
 
     // MARK: - 列表
 
+    /// 每条随想单独一个卡片
     private var thoughtList: some View {
         List {
-            ForEach(sections, id: \.day) { section in
+            ForEach(filteredThoughts) { thought in
                 Section {
-                    ForEach(section.items) { thought in
-                        NavigationLink(value: thought) {
-                            ThoughtRow(thought: thought)
+                    NavigationLink(value: thought) {
+                        ThoughtRow(thought: thought)
+                    }
+                    .swipeActions {
+                        Button("删除", systemImage: "trash", role: .destructive) {
+                            modelContext.delete(thought)
                         }
                     }
-                    .onDelete { offsets in
-                        for index in offsets {
-                            modelContext.delete(section.items[index])
-                        }
-                    }
-                } header: {
-                    Text(section.day.formatted(.dateTime.year().month().day().weekday(.wide)))
                 }
             }
         }
+        .listSectionSpacing(12)
     }
 
     private var emptyView: some View {
@@ -124,15 +116,14 @@ struct ContentView: View {
 
     private var recordBar: some View {
         VStack(spacing: 8) {
-            Text(statusText)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
+            if let statusText {
+                Text(statusText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
 
-            HStack(spacing: 32) {
-                // 占位，让麦克风按钮保持居中
-                Color.clear.frame(width: 44, height: 44)
-
+            HStack(spacing: 48) {
                 Button(action: toggleRecording) {
                     ZStack {
                         Circle()
@@ -153,8 +144,8 @@ struct ContentView: View {
                     showingNewThought = true
                 } label: {
                     Image(systemName: "keyboard")
-                        .font(.title3)
-                        .frame(width: 44, height: 44)
+                        .font(.title)
+                        .frame(width: 72, height: 72)
                         .background(Color(.secondarySystemFill), in: Circle())
                 }
                 .disabled(phase != .idle)
@@ -165,13 +156,11 @@ struct ContentView: View {
         .background(.bar)
     }
 
-    private var statusText: String {
+    /// 只在录音和处理中显示
+    private var statusText: String? {
         switch phase {
         case .idle:
-            if let selectedDay, !Calendar.current.isDateInToday(selectedDay) {
-                return "点击录音，记到 \(selectedDay.formatted(.dateTime.month().day()))"
-            }
-            return "点击开始录音"
+            return nil
         case .recording:
             return "录音中 " + Duration.seconds(recorder.elapsed).formatted(.time(pattern: .minuteSecond))
         case .transcribing:
@@ -245,7 +234,7 @@ struct ContentView: View {
         // 2. 润色
         phase = .polishing
         do {
-            thought.polishedText = try await service.polish(thought.rawText)
+            thought.polishedAttributedText = try await service.polish(thought.rawAttributedText)
         } catch {
             errorMessage = "原文已保存，但润色失败：\(error.localizedDescription)"
         }
@@ -253,14 +242,15 @@ struct ContentView: View {
     }
 
     /// 保存手动输入的随想，需要时再润色
-    private func saveTypedThought(_ text: String, date: Date, polish: Bool) async {
-        let thought = Thought(date: date, rawText: text)
+    private func saveTypedThought(_ text: NSAttributedString, date: Date, polish: Bool) async {
+        let thought = Thought(date: date, rawText: text.string)
+        thought.rawAttributedText = text
         modelContext.insert(thought)
         guard polish else { return }
 
         phase = .polishing
         do {
-            thought.polishedText = try await OpenAIService.fromSettings().polish(text)
+            thought.polishedAttributedText = try await OpenAIService.fromSettings().polish(text)
         } catch {
             errorMessage = "原文已保存，但润色失败：\(error.localizedDescription)"
         }
@@ -285,19 +275,23 @@ private struct ThoughtRow: View {
     let thought: Thought
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(dateText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Text(thought.displayText)
                 .lineLimit(3)
-            HStack {
-                Text(thought.date, format: .dateTime.hour().minute())
-                if thought.polishedText.isEmpty {
-                    Text("· 未润色")
-                }
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
+    }
+
+    /// 今年的不显示年份
+    private var dateText: String {
+        let isThisYear = Calendar.current.isDate(thought.date, equalTo: .now, toGranularity: .year)
+        let format: Date.FormatStyle = isThisYear
+            ? .dateTime.month().day().weekday().hour().minute()
+            : .dateTime.year().month().day().weekday().hour().minute()
+        return thought.date.formatted(format)
     }
 }
 

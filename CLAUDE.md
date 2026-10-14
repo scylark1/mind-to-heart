@@ -23,6 +23,7 @@ xcodebuild -project MindToHeart.xcodeproj -scheme MindToHeart \
 ## 代码结构
 
 - `MindToHeart/Models/Thought.swift`：数据模型（date、rawText、polishedText）
+- `MindToHeart/Models/RichText.swift`：带格式文字的样式和存取（格式存在 `rawRichText`/`polishedRichText`，纯文本字段始终同步，供列表、润色、分享用）
 - `MindToHeart/Services/AudioRecorder.swift`：录音
 - `MindToHeart/Services/OpenAIService.swift`：转文字和润色，润色提示词是 `polishPrompt`
-- `MindToHeart/Views/`：主页列表 + 录音按钮、日历筛选、详情、设置
+- `MindToHeart/Views/`：主页列表 + 录音/打字按钮、日历筛选、详情、设置；`RichTextEditor.swift` 是类似备忘录的带格式编辑器（UITextView 包装，支持 iOS 17）

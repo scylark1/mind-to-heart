@@ -9,6 +9,9 @@ final class Thought {
     var createdAt: Date
     var rawText: String
     var polishedText: String
+    /// 带格式的版本（加粗、标题、列表等），为空时按纯文本显示。见 RichText
+    var rawRichText: Data?
+    var polishedRichText: Data?
 
     init(date: Date = .now, rawText: String, polishedText: String = "") {
         self.date = date
