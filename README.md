@@ -21,7 +21,7 @@
 1. 用 Xcode 打开 `MindToHeart.xcodeproj`
 2. 选中项目 → Target `MindToHeart` → **Signing & Capabilities**
    - Team：选你的 Apple ID（没有的话点 Add Account 登录）
-   - Bundle Identifier：把 `com.example.MindToHeart` 改成独一无二的，比如 `com.你的名字.MindToHeart`
+   - Bundle Identifier：已设为 `com.changyisong.MindToHeart`，如果提示已被占用再换一个
 3. 用数据线连上 iPhone，在顶部选择你的手机，点 ▶︎ 运行
    - 第一次运行时，要在手机上打开「设置 > 通用 > VPN与设备管理」，信任你的开发者证书
    - 手机还需要打开「设置 > 隐私与安全性 > 开发者模式」
