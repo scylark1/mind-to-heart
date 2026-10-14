@@ -8,7 +8,7 @@ enum SettingsKey {
 
 /// 调用 OpenAI：语音转文字 + 润色。
 struct OpenAIService {
-    static let defaultChatModel = "gpt-4o-mini"
+    static let defaultChatModel = "gpt-6-luna"
     static let defaultTranscribeModel = "gpt-4o-transcribe"
 
     var apiKey: String
