@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var selectedDay: Date?
     @State private var showingCalendar = false
     @State private var showingSettings = false
+    @State private var showingNewThought = false
     @State private var errorMessage: String?
 
     enum Phase {
@@ -72,6 +73,11 @@ struct ContentView: View {
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
+            .sheet(isPresented: $showingNewThought) {
+                NewThoughtSheet(date: dateForNewThought()) { text, date, polish in
+                    Task { await saveTypedThought(text, date: date, polish: polish) }
+                }
+            }
             .alert("出错了", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
@@ -110,7 +116,7 @@ struct ContentView: View {
         ContentUnavailableView(
             selectedDay == nil ? "还没有随想" : "这一天没有记录",
             systemImage: "text.bubble",
-            description: Text("点下面的麦克风，说出你的想法")
+            description: Text("点下面的麦克风说出你的想法，或者点键盘打字")
         )
     }
 
@@ -123,21 +129,36 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
 
-            Button(action: toggleRecording) {
-                ZStack {
-                    Circle()
-                        .fill(phase == .recording ? Color.red : Color.accentColor)
-                        .frame(width: 72, height: 72)
-                    if isBusy {
-                        ProgressView().tint(.white)
-                    } else {
-                        Image(systemName: phase == .recording ? "stop.fill" : "mic.fill")
-                            .font(.title)
-                            .foregroundStyle(.white)
+            HStack(spacing: 32) {
+                // 占位，让麦克风按钮保持居中
+                Color.clear.frame(width: 44, height: 44)
+
+                Button(action: toggleRecording) {
+                    ZStack {
+                        Circle()
+                            .fill(phase == .recording ? Color.red : Color.accentColor)
+                            .frame(width: 72, height: 72)
+                        if isBusy {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: phase == .recording ? "stop.fill" : "mic.fill")
+                                .font(.title)
+                                .foregroundStyle(.white)
+                        }
                     }
                 }
+                .disabled(isBusy)
+
+                Button {
+                    showingNewThought = true
+                } label: {
+                    Image(systemName: "keyboard")
+                        .font(.title3)
+                        .frame(width: 44, height: 44)
+                        .background(Color(.secondarySystemFill), in: Circle())
+                }
+                .disabled(phase != .idle)
             }
-            .disabled(isBusy)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
@@ -225,6 +246,21 @@ struct ContentView: View {
         phase = .polishing
         do {
             thought.polishedText = try await service.polish(thought.rawText)
+        } catch {
+            errorMessage = "原文已保存，但润色失败：\(error.localizedDescription)"
+        }
+        phase = .idle
+    }
+
+    /// 保存手动输入的随想，需要时再润色
+    private func saveTypedThought(_ text: String, date: Date, polish: Bool) async {
+        let thought = Thought(date: date, rawText: text)
+        modelContext.insert(thought)
+        guard polish else { return }
+
+        phase = .polishing
+        do {
+            thought.polishedText = try await OpenAIService.fromSettings().polish(text)
         } catch {
             errorMessage = "原文已保存，但润色失败：\(error.localizedDescription)"
         }
