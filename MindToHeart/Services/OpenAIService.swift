@@ -114,16 +114,18 @@ struct OpenAIService {
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
-            struct APIError: Decodable {
-                struct Detail: Decodable { let message: String }
-                let error: Detail
-            }
             let message = (try? JSONDecoder().decode(APIError.self, from: data))?.error.message
                 ?? String(data: data, encoding: .utf8)
                 ?? "未知错误"
             throw ServiceError.api(status: status, message: message)
         }
         return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    /// OpenAI 出错时返回的 JSON：{"error": {"message": "..."}}
+    private struct APIError: Decodable {
+        struct Detail: Decodable { let message: String }
+        let error: Detail
     }
 
     enum ServiceError: LocalizedError {
