@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct ThoughtDetailView: View {
+    @Environment(\.modelContext) private var modelContext
     @Bindable var thought: Thought
     @State private var showOriginal = false
     @State private var isPolishing = false
@@ -14,8 +15,12 @@ struct ThoughtDetailView: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(spacing: 8) {
-                DatePicker("日期", selection: $thought.date)
-                    .labelsHidden()
+                HStack {
+                    DatePicker("日期", selection: $thought.date)
+                        .labelsHidden()
+                    Spacer()
+                    PhotoAddButton(onAdd: addPhotos)
+                }
 
                 if hasPolished {
                     Picker("版本", selection: $showOriginal) {
@@ -26,7 +31,16 @@ struct ThoughtDetailView: View {
                 }
             }
             .padding(.horizontal)
-            .padding(.top, 8)
+            .padding(.vertical, 8)
+
+            let photos = thought.sortedPhotos
+            if !photos.isEmpty {
+                PhotoStrip(photos: photos.map { PhotoItem(id: $0.persistentModelID, data: $0.data) }) { id in
+                    if let photo = photos.first(where: { $0.persistentModelID == id as? PersistentIdentifier }) {
+                        modelContext.delete(photo)
+                    }
+                }
+            }
 
             if showOriginal || !hasPolished {
                 RichTextEditor(text: $thought.rawAttributedText)
@@ -60,6 +74,14 @@ struct ThoughtDetailView: View {
             Button("好", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "")
+        }
+    }
+
+    private func addPhotos(_ images: [Data]) {
+        for data in images {
+            let photo = ThoughtPhoto(data: data)
+            modelContext.insert(photo)
+            photo.thought = thought
         }
     }
 

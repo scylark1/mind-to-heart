@@ -68,8 +68,8 @@ struct ContentView: View {
                 SettingsView()
             }
             .sheet(isPresented: $showingNewThought) {
-                NewThoughtSheet(date: dateForNewThought()) { text, date, polish in
-                    Task { await saveTypedThought(text, date: date, polish: polish) }
+                NewThoughtSheet(date: dateForNewThought()) { text, photos, date, polish in
+                    Task { await saveTypedThought(text, photos: photos, date: date, polish: polish) }
                 }
             }
             .alert("出错了", isPresented: Binding(
@@ -242,11 +242,16 @@ struct ContentView: View {
     }
 
     /// 保存手动输入的随想，需要时再润色
-    private func saveTypedThought(_ text: NSAttributedString, date: Date, polish: Bool) async {
+    private func saveTypedThought(_ text: NSAttributedString, photos: [Data], date: Date, polish: Bool) async {
         let thought = Thought(date: date, rawText: text.string)
         thought.rawAttributedText = text
         modelContext.insert(thought)
-        guard polish else { return }
+        for data in photos {
+            let photo = ThoughtPhoto(data: data)
+            modelContext.insert(photo)
+            photo.thought = thought
+        }
+        guard polish, text.length > 0 else { return }
 
         phase = .polishing
         do {
@@ -275,12 +280,32 @@ private struct ThoughtRow: View {
     let thought: Thought
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(dateText)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(thought.displayText)
-                .lineLimit(3)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(dateText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if !thought.displayText.isEmpty {
+                    Text(thought.displayText)
+                        .lineLimit(3)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            let photos = thought.sortedPhotos
+            if let first = photos.first {
+                PhotoThumbnail(data: first.data, size: 56)
+                    .overlay(alignment: .bottomTrailing) {
+                        if photos.count > 1 {
+                            Text("\(photos.count)")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 5)
+                                .background(.black.opacity(0.5), in: Capsule())
+                                .padding(4)
+                        }
+                    }
+            }
         }
         .padding(.vertical, 4)
     }
