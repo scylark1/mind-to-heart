@@ -9,7 +9,7 @@ enum SettingsKey {
 /// 调用 OpenAI：语音转文字 + 润色。
 struct OpenAIService {
     static let defaultChatModel = "gpt-6-luna"
-    static let defaultTranscribeModel = "gpt-4o-transcribe"
+    static let defaultTranscribeModel = "gpt-transcribe"
 
     var apiKey: String
     var chatModel = Self.defaultChatModel
@@ -60,7 +60,6 @@ struct OpenAIService {
             body.append("\(value)\r\n")
         }
         appendField("model", transcribeModel)
-        appendField("response_format", "json")
         appendField("prompt", "以下是一段随口说的想法，请使用简体中文。")
 
         body.append("--\(boundary)\r\n")
